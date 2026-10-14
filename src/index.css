@@ -1,0 +1,115 @@
+/* ============================================
+   ALTURA — Premium Luxury Real Estate
+   Global Styles & Design System
+   ============================================ */
+
+/* CSS Custom Properties — Design Tokens */
+:root {
+  /* Colors */
+  --color-bg-main: #10131C;
+  --color-bg-hero: #171C2A;
+  --color-bg-secondary: #202432;
+  --color-text-primary: #E9E8E5;
+  --color-text-secondary: #A7A8B0;
+  --color-accent: #C8A97E;
+  --color-border: #343846;
+  --color-bg-card: #1A1E2C;
+  --color-bg-nav: rgba(16, 19, 28, 0.85);
+
+  /* Typography */
+  --font-serif: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Spacing */
+  --nav-height: 72px;
+  --section-padding: 80px;
+  --container-max: 1440px;
+  --container-padding: 40px;
+
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-base: 0.3s ease;
+  --transition-slow: 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Reset & Base */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: auto; /* Disabled for GSAP scroll control */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  width: 100%;
+  min-width: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-bg-main);
+  color: var(--color-text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  transition: color var(--transition-fast);
+}
+
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-main);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-bg-main);
+}
+
+[id] {
+  scroll-margin-top: var(--nav-height);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --nav-height: 64px;
+  }
+}

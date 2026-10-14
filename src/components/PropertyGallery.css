@@ -1,0 +1,119 @@
+.property-gallery {
+  position: relative;
+  z-index: 20;
+  width: 100%;
+  min-width: 0;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--container-padding);
+}
+
+.property-gallery__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  margin-bottom: 20px;
+}
+
+.property-gallery__title-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 12px;
+}
+
+.property-gallery__label-line {
+  display: block;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 1px;
+  background: var(--color-accent);
+}
+
+.property-gallery__label {
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 2.5px;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.property-gallery__arrows {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.property-gallery__arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.property-gallery__arrow:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.property-gallery__arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.property-gallery__scroll {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  min-width: 0;
+  overflow: visible;
+}
+
+.property-gallery__scroll > * {
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 1199px) {
+  .property-gallery__scroll {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .property-gallery {
+    padding: 0 20px;
+  }
+
+  .property-gallery__header {
+    margin-bottom: 14px;
+  }
+
+  .property-gallery__arrow {
+    width: 36px;
+    height: 36px;
+  }
+
+  .property-gallery__scroll {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 4px;
+  }
+
+  .property-gallery__scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
