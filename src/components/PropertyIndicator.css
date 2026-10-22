@@ -38,7 +38,6 @@
   left: 0;
   width: 100%;
   background: var(--color-accent);
-  transition: height 0.3s ease;
 }
 
 .property-indicator__dot {
@@ -51,7 +50,6 @@
   background: var(--color-accent);
   box-shadow: 0 0 8px rgba(200, 169, 126, 0.4);
   transform: translate(-50%, -50%);
-  transition: top 0.3s ease;
 }
 
 @media (max-width: 1024px) {

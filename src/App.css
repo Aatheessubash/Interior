@@ -7,6 +7,13 @@
   background: var(--color-bg-main);
 }
 
+.gallery-section {
+  position: relative;
+  z-index: 10;
+  padding: clamp(48px, 6vh, 80px) 0 clamp(60px, 8vh, 100px);
+  background: var(--color-bg-main);
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;

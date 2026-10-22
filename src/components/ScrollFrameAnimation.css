@@ -6,14 +6,18 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  background: var(--color-bg-hero);
+  /* Isolate layout/paint so canvas updates never invalidate ancestors. */
+  contain: layout paint;
 }
 
 .scroll-frame__canvas {
+  display: block;
   width: 100%;
   height: 100%;
-  display: block;
-  object-fit: cover;
-  object-position: center;
+  image-rendering: auto;
+  /* Hardware-accelerated compositing layer */
+  transform: translateZ(0);
 }
 
 .scroll-frame__loader {
@@ -26,12 +30,21 @@
   align-items: center;
   gap: 12px;
   z-index: 5;
+  pointer-events: none;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.5s ease;
+}
+
+.scroll-frame__loader.is-hidden {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .scroll-frame__loader-ring {
   width: 48px;
   height: 48px;
-  animation: frame-loader-spin 2s linear infinite;
+  animation: frame-loader-spin 1.8s linear infinite;
 }
 
 .scroll-frame__loader-ring svg {
@@ -39,11 +52,15 @@
   height: 100%;
 }
 
+.scroll-frame__loader-ring circle {
+  transition: stroke-dasharray 0.2s ease;
+}
+
 .scroll-frame__loader-text {
   font-family: var(--font-sans);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 500;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
   color: var(--color-accent);
   text-transform: uppercase;
 }
@@ -57,8 +74,7 @@
   .scroll-frame__loader-ring {
     animation: none;
   }
-
-  .scroll-frame__loader circle {
+  .scroll-frame__loader-ring circle {
     transition: none !important;
   }
 }
