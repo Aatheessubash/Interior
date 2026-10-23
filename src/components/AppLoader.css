@@ -1,0 +1,95 @@
+/* ============================================
+   AppLoader — Full-screen Lottie loader
+   Shown once on initial page load for ≥2 s,
+   then fades out once the hero frame is ready.
+   ============================================ */
+
+.app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  background: var(--color-bg-main);
+  /* Prevent interaction with content behind the loader */
+  pointer-events: all;
+  /* Smooth fade-out */
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-loader.is-exiting {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Lottie container */
+.app-loader__animation {
+  width: clamp(100px, 20vw, 160px);
+  height: clamp(100px, 20vw, 160px);
+  opacity: 0;
+  transform: scale(0.92);
+  animation: loaderFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+}
+
+/* ALTURA wordmark beneath the animation */
+.app-loader__brand {
+  font-family: var(--font-serif);
+  font-size: clamp(18px, 3vw, 28px);
+  font-weight: 400;
+  letter-spacing: 0.4em;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: loaderFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.35s forwards;
+}
+
+/* Subtle progress bar beneath brand */
+.app-loader__progress {
+  width: clamp(80px, 14vw, 140px);
+  height: 1px;
+  background: rgba(200, 169, 126, 0.15);
+  border-radius: 1px;
+  overflow: hidden;
+  opacity: 0;
+  animation: loaderFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+}
+
+.app-loader__progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--color-accent);
+  border-radius: 1px;
+  transition: width 0.3s ease;
+}
+
+@keyframes loaderFadeIn {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .app-loader__animation,
+  .app-loader__brand,
+  .app-loader__progress {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .app-loader {
+    transition: none;
+  }
+  .app-loader__progress-bar {
+    transition: none;
+  }
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import ScrollFrameAnimation from './ScrollFrameAnimation';
+import ScrollFrameAnimation, { TOTAL_FRAMES } from './ScrollFrameAnimation';
 import Navbar from './Navbar';
 import HeroContent from './HeroContent';
 import PropertyIndicator from './PropertyIndicator';
@@ -9,11 +9,14 @@ import './HeroSection.css';
 
 gsap.registerPlugin(ScrollTrigger);
 
-export default function HeroSection() {
+// Avoid pin/scroll re-calculations (and resulting jank) when the mobile browser
+// toolbar shows/hides during scroll. Orientation changes still refresh normally.
+ScrollTrigger.config({ ignoreMobileResize: true });
+
+export default function HeroSection({ onFirstFrameReady }) {
   const sectionRef = useRef(null);
   const frameAnimationRef = useRef(null);
-  const indicatorPercentRef = useRef(0);
-  const [indicatorProgress, setIndicatorProgress] = useState(0);
+  const indicatorRef = useRef(null);
   const [reducedMotion, setReducedMotion] = useState(
     () =>
       typeof window !== 'undefined' &&
@@ -21,11 +24,10 @@ export default function HeroSection() {
   );
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const handleChange = () => setReducedMotion(mediaQuery.matches);
-
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = () => setReducedMotion(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
   }, []);
 
   useEffect(() => {
@@ -34,65 +36,59 @@ export default function HeroSection() {
 
     const media = gsap.matchMedia();
 
-    const updateProgress = (progress) => {
+    const pushProgress = (progress) => {
       frameAnimationRef.current?.setProgress(progress);
-      const nextPercent = Math.round(progress * 100);
-
-      if (nextPercent !== indicatorPercentRef.current) {
-        indicatorPercentRef.current = nextPercent;
-        setIndicatorProgress(progress);
-      }
+      indicatorRef.current?.update(progress);
     };
 
     media.add('(prefers-reduced-motion: no-preference)', () => {
-      const trigger = ScrollTrigger.create({
-        trigger: section,
-        start: 'top top',
-        end: 'bottom bottom',
-        pin: '.hero-section__sticky',
-        pinSpacing: true,
-        anticipatePin: 1,
-        scrub: 1.2,
-        invalidateOnRefresh: true,
-        onUpdate: (self) => updateProgress(self.progress),
-        onRefresh: (self) => updateProgress(self.progress),
+      // Linear playhead. High numeric scrub heavily glides the frame index so
+      // even abrupt scrolls ease in/out; ease stays "none" so scroll distance
+      // still maps evenly across the sequence once settled.
+      const playhead = { frame: 0 };
+      const tween = gsap.to(playhead, {
+        frame: TOTAL_FRAMES - 1,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: section,
+          start: 'top top',
+          end: 'bottom bottom',
+          pin: '.hero-section__sticky',
+          pinSpacing: false,
+          anticipatePin: 1,
+          scrub: 0.6,
+        },
+        onUpdate: () => pushProgress(playhead.frame / (TOTAL_FRAMES - 1)),
       });
 
-      updateProgress(trigger.progress);
-
-      return () => {
-        trigger.kill();
-      };
+      pushProgress(0);
+      return () => tween.kill();
     });
 
     media.add('(prefers-reduced-motion: reduce)', () => {
-      updateProgress(0);
+      pushProgress(0);
     });
 
-    return () => {
-      media.revert();
-    };
+    return () => media.revert();
   }, []);
 
   return (
     <section className="hero-section" ref={sectionRef} id="home">
       <div className="hero-section__sticky">
         <Navbar />
-
         <div className="hero-section__bg" />
-
         <div className="hero-section__frame">
           <ScrollFrameAnimation
             ref={frameAnimationRef}
             reducedMotion={reducedMotion}
+            onFirstFrameReady={onFirstFrameReady}
           />
         </div>
-
         <div className="hero-section__container">
           <div className="hero-section__left">
             <HeroContent />
           </div>
-          <PropertyIndicator progress={indicatorProgress} />
+          <PropertyIndicator ref={indicatorRef} />
         </div>
       </div>
     </section>
