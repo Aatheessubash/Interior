@@ -16,8 +16,8 @@ import './AppLoader.css';
  *   - onComplete()  — called after the exit animation finishes.
  *   - heroReady     — boolean, true once the first hero frame can be drawn.
  */
-const MIN_DISPLAY_MS = 2000;
-const EXIT_DURATION_MS = 300;
+const MIN_DISPLAY_MS = 1250;
+const EXIT_DURATION_MS = 320;
 
 export default function AppLoader({ onComplete, heroReady = false }) {
   const containerRef = useRef(null);
@@ -81,15 +81,17 @@ export default function AppLoader({ onComplete, heroReady = false }) {
         progressiveLoad: false,
       },
     });
+    // Set a brisk, energetic playback speed (1.25x) so the animation feels snappy and modern
+    anim.setSpeed(1.25);
     lottieRef.current = anim;
 
-    // Animate the progress bar loosely while loading.
+    // Animate the progress bar smoothly during load
     let progressRaf;
     const animateProgress = () => {
       const elapsed = Date.now() - mountTimeRef.current;
-      // Ease to ~85% over 2 seconds, the remaining 15% fills on exit.
+      // Smoothly advance progress bar to ~88% over MIN_DISPLAY_MS, the remaining fills cleanly on exit
       const t = Math.min(elapsed / MIN_DISPLAY_MS, 1);
-      const pct = Math.round(t * 85);
+      const pct = Math.round(t * 88);
       if (progressRef.current) {
         progressRef.current.style.width = `${pct}%`;
       }

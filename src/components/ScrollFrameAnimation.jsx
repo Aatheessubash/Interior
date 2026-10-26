@@ -12,11 +12,11 @@ const FRAME_BASE = '/frames/frames';
 const IMAGE_WIDTH = 1280;
 const IMAGE_HEIGHT = 720;
 
-// Windowed preloading: only keep this many frames in memory around the current
-// scroll position. Distant frames are evicted to prevent ~800 MB memory bloat.
-const BUFFER_AHEAD = 35;
-const BUFFER_BEHIND = 20;
-const EVICT_DISTANCE = 55;
+// Two-tier preloading:
+// 1. Priority Focus Window: Loads frames immediately around current scroll position with highest priority.
+// 2. Background Stream: Continues progressively loading all remaining frames during idle time so no frame is ever missing or stuck.
+const PRIORITY_AHEAD = 45;
+const PRIORITY_BEHIND = 20;
 
 // Decoded-frame status codes.
 const PENDING = 0;
@@ -32,16 +32,15 @@ function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-// Adaptive decode concurrency: keep the main thread/network responsive on
-// low-core / low-memory / small-screen devices.
+// Adaptive decode concurrency: balances network throughput and main thread fluidity.
 function pickConcurrency() {
   const cores =
     (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4;
   const memory =
     (typeof navigator !== 'undefined' && navigator.deviceMemory) || 4;
 
-  let concurrency = cores >= 8 ? 6 : 4;
-  if (memory <= 4) concurrency = Math.min(concurrency, 3);
+  let concurrency = cores >= 8 ? 8 : 6;
+  if (memory <= 4) concurrency = Math.min(concurrency, 4);
   if (
     typeof window !== 'undefined' &&
     window.matchMedia('(max-width: 768px)').matches
@@ -137,9 +136,8 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
-    // Cap DPR at 1.5: avoids 4K buffer double-sampling blur on 720p assets,
-    // keeping memory footprint small and guaranteeing silky 60/120fps.
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    // Device pixel ratio up to 2.0 ensures crisp, high-definition rendering on modern screens
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = Math.round(rect.width * dpr);
     const h = Math.round(rect.height * dpr);
 
@@ -223,7 +221,7 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
 
       const ctx = ctxRef.current;
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'medium';
+      ctx.imageSmoothingQuality = 'high';
       const { sx, sy, sw, sh } = cropRef.current;
 
       try {
@@ -304,11 +302,13 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
           updateDimensions();
         }
 
-        // Always re-check the canvas when a frame lands. The stamp dedupe in
-        // draw() makes this cheap, and it upgrades a stuck fallback frame the
-        // moment a closer one becomes available — otherwise the screen can
-        // freeze mid-sequence until the next decode or scroll event.
-        scheduleDraw();
+        // Paint the first frame immediately as soon as it lands
+        if (drawnRef.current === -1 && index === 0) {
+          drawRef.current?.(0);
+        } else {
+          // Always re-check the canvas when a frame lands to upgrade fallback frames seamlessly
+          scheduleDraw();
+        }
       } else {
         status[index] = FAILED;
       }
@@ -316,7 +316,7 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
       pump();
     };
 
-    const startLoad = (index) => {
+    const startLoad = (index, isHighPriority = false) => {
       if (disposed || status[index] !== PENDING) return;
 
       status[index] = LOADING;
@@ -325,7 +325,9 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
       const img = new Image();
       images[index] = img;
       img.decoding = 'async';
-      if (index === 0) img.fetchPriority = 'high';
+      if (isHighPriority || index === 0) {
+        img.fetchPriority = 'high';
+      }
 
       let settled = false;
       const settle = (ok) => {
@@ -343,7 +345,6 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
           .decode()
           .then(() => settle(true))
           .catch(() => {
-            // decode() can reject before the load completes; fall back to onload.
             if (img.complete) settle(img.naturalWidth > 0);
           });
       }
@@ -355,21 +356,41 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
       const center = clamp(Math.round(desiredRef.current), 0, preloadTotal - 1);
       const dir = dirRef.current;
 
-      // Compute the window of frames we want loaded.
-      const lo = clamp(center - BUFFER_BEHIND, 0, preloadTotal - 1);
-      const hi = clamp(center + BUFFER_AHEAD, 0, preloadTotal - 1);
+      const lo = clamp(center - PRIORITY_BEHIND, 0, preloadTotal - 1);
+      const hi = clamp(center + PRIORITY_AHEAD, 0, preloadTotal - 1);
 
-      if (Math.abs(center - queueCenter) > 2 || dir !== queueDir) {
-        // Build queue only for frames within our window.
-        queue = buildQueue(center, dir, preloadTotal).filter(i => i >= lo && i <= hi);
+      // 1. Build and refill the priority queue around current viewport
+      if (Math.abs(center - queueCenter) > 2 || dir !== queueDir || queue.length === 0) {
+        queue = buildQueue(center, dir, preloadTotal).filter(
+          (i) => i >= lo && i <= hi && status[i] === PENDING
+        );
         queueCenter = center;
         queueDir = dir;
       }
 
+      // 2. Dispatch priority frames first
       while (active < maxConcurrency && queue.length) {
         const index = queue.shift();
-        if (status[index] !== PENDING) continue;
-        startLoad(index);
+        if (status[index] === PENDING) {
+          startLoad(index, true);
+        }
+      }
+
+      // 3. Background stream: fill remaining concurrency with all pending sequence frames
+      // radiating outward from current playhead so entire sequence caches smoothly without UI blocks
+      if (active < maxConcurrency && readyCount < preloadTotal) {
+        for (let d = 0; d < preloadTotal && active < maxConcurrency; d++) {
+          const ahead = center + d;
+          if (ahead < preloadTotal && status[ahead] === PENDING) {
+            startLoad(ahead, false);
+            if (active >= maxConcurrency) break;
+          }
+          const behind = center - d;
+          if (behind >= 0 && status[behind] === PENDING) {
+            startLoad(behind, false);
+            if (active >= maxConcurrency) break;
+          }
+        }
       }
     };
 
