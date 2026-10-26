@@ -56,7 +56,7 @@ export default function HeroSection({ onFirstFrameReady }) {
           pin: '.hero-section__sticky',
           pinSpacing: false,
           anticipatePin: 1,
-          scrub: 0.6,
+          scrub: 0.5,
         },
         onUpdate: () => pushProgress(playhead.frame / (TOTAL_FRAMES - 1)),
       });

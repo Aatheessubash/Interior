@@ -6,17 +6,17 @@ import './PropertyGallery.css';
 // Use frames from the animation as gallery thumbnails
 const properties = [
   {
-    image: '/frames/frames00060.png',
+    image: '/frames/frames00060.webp',
     label: 'PENTHOUSE',
     title: 'The Skyline Suite',
   },
   {
-    image: '/frames/frames00100.png',
+    image: '/frames/frames00100.webp',
     label: 'RESIDENCE',
     title: 'The Grand Terrace',
   },
   {
-    image: '/frames/frames00140.png',
+    image: '/frames/frames00140.webp',
     label: 'VILLA',
     title: 'The Garden Estate',
   },

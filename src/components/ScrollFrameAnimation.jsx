@@ -120,31 +120,13 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
     return -1;
   }, []);
 
-  // ── Continuous rAF glide loop: eases the frame index toward the scroll ──
-  // target each tick, coalescing any number of scroll updates into one draw
-  // per compositor frame. Stops once the eased value has settled.
-  const LERP = 0.22;
-  const SNAP_EPSILON = 0.004;
-
+  // ── Sync draw with browser refresh rate (GSAP handles smooth easing) ──
   const scheduleDraw = useCallback(() => {
     if (rafRef.current !== null) return;
-    const step = () => {
-      const desired = desiredRef.current;
-      const current = smoothRef.current;
-      const diff = desired - current;
-
-      if (Math.abs(diff) <= SNAP_EPSILON) {
-        smoothRef.current = desired;
-        rafRef.current = null;
-        drawRef.current?.(desired);
-        return;
-      }
-
-      smoothRef.current = current + diff * LERP;
-      drawRef.current?.(smoothRef.current);
-      rafRef.current = requestAnimationFrame(step);
-    };
-    rafRef.current = requestAnimationFrame(step);
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      drawRef.current?.(desiredRef.current);
+    });
   }, []);
 
   // ── Recompute canvas size + cover-fit crop only when the element changes ──
@@ -155,7 +137,9 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Cap DPR at 1.5: avoids 4K buffer double-sampling blur on 720p assets,
+    // keeping memory footprint small and guaranteeing silky 60/120fps.
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const w = Math.round(rect.width * dpr);
     const h = Math.round(rect.height * dpr);
 
@@ -201,7 +185,7 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
     scheduleDraw();
   }, [scheduleDraw]);
 
-  // ── Cover-fit blit. Adjacent frames are crossfaded so the sequence glides. ──
+  // ── Cover-fit blit. Draws the nearest frame cleanly without ghosting blur. ──
   const draw = useCallback(
     (target) => {
       const canvas = canvasRef.current;
@@ -215,34 +199,21 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
 
       const maxIndex = TOTAL_FRAMES - 1;
       const exact = clamp(Number(target) || 0, 0, maxIndex);
-      const lower = Math.min(maxIndex, Math.floor(exact));
-      const upper = Math.min(maxIndex, lower + 1);
-      let blend = exact - lower;
+      const nearest = Math.round(exact);
 
       const status = statusRef.current;
       const images = imagesRef.current;
 
-      let from = lower;
-      let to = upper;
-      if (status[from] !== READY) {
-        from = resolveFrame(lower);
-        if (from < 0) return;
-        to = from;
-        blend = 0;
-      } else if (to === from || status[to] !== READY || blend < 0.02) {
-        to = from;
-        blend = 0;
+      let frameIndex = nearest;
+      if (status[frameIndex] !== READY) {
+        frameIndex = resolveFrame(nearest);
+        if (frameIndex < 0) return;
       }
 
-      // Quantised stamp: skip redraw only when from/to/blend are unchanged.
-      // 64 blend steps keep the crossfade visually continuous.
-      const stamp =
-        from +
-        to * TOTAL_FRAMES +
-        Math.round(blend * 64) * TOTAL_FRAMES * TOTAL_FRAMES;
-      if (stamp === drawnRef.current) return;
+      // Skip redraw if the exact same frame is already on screen
+      if (frameIndex === drawnRef.current) return;
 
-      const baseImg = images[from];
+      const baseImg = images[frameIndex];
       if (!baseImg) return;
 
       if (!ctxRef.current) {
@@ -252,20 +223,15 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
 
       const ctx = ctxRef.current;
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+      ctx.imageSmoothingQuality = 'medium';
       const { sx, sy, sw, sh } = cropRef.current;
 
       try {
         ctx.globalAlpha = 1;
         ctx.drawImage(baseImg, sx, sy, sw, sh, 0, 0, w, h);
-        if (blend > 0 && images[to]) {
-          ctx.globalAlpha = blend;
-          ctx.drawImage(images[to], sx, sy, sw, sh, 0, 0, w, h);
-          ctx.globalAlpha = 1;
-        }
-        drawnRef.current = stamp;
+        drawnRef.current = frameIndex;
       } catch {
-        ctx.globalAlpha = 1;
+        // silent
       }
     },
     [resolveFrame, updateDimensions]
@@ -383,33 +349,11 @@ const ScrollFrameAnimation = forwardRef(function ScrollFrameAnimation(
       }
     };
 
-    // Evict decoded frames that are far from the current scroll position to
-    // cap browser memory at ~180 MB instead of ~800 MB.
-    const evictDistant = (center) => {
-      for (let i = 0; i < TOTAL_FRAMES; i++) {
-        if (status[i] !== READY) continue;
-        const dist = Math.abs(i - center);
-        if (dist > EVICT_DISTANCE) {
-          const img = images[i];
-          if (img) {
-            img.onload = null;
-            img.onerror = null;
-            img.src = '';
-            images[i] = null;
-          }
-          status[i] = PENDING;
-        }
-      }
-    };
-
     const pump = () => {
       if (disposed) return;
 
       const center = clamp(Math.round(desiredRef.current), 0, preloadTotal - 1);
       const dir = dirRef.current;
-
-      // Evict frames far from current view to free memory.
-      evictDistant(center);
 
       // Compute the window of frames we want loaded.
       const lo = clamp(center - BUFFER_BEHIND, 0, preloadTotal - 1);
